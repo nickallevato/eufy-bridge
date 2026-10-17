@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Run MediaMTX with this folder's config. The binary is not vendored:
+#   v=1.15.3; mkdir -p ~/.local/opt/mediamtx && curl -sL \
+#     https://github.com/bluenviron/mediamtx/releases/download/v$v/mediamtx_v${v}_linux_amd64.tar.gz \
+#     | tar -xz -C ~/.local/opt/mediamtx mediamtx
+set -euo pipefail
+bin="${MEDIAMTX:-$HOME/.local/opt/mediamtx/mediamtx}"
+cd "$(dirname "$0")/.."
+exec "$bin" mediamtx.yml

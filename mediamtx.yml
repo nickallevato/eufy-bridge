@@ -1,0 +1,14 @@
+# MediaMTX for the eufy bridge. The bridge publishes `doorbell` continuously
+# (idle loop + live on events); Shinobi and browsers read it.
+#   rtsp://<host>:8554/doorbell      NVR / VLC / ffplay
+#   http://<host>:8889/doorbell/     browser (WebRTC)
+logLevel: info
+api: yes
+apiAddress: 127.0.0.1:9997
+rtspAddress: :8554
+hlsAddress: :8888
+webrtcAddress: :8889
+rtmp: no
+srt: no
+paths:
+  doorbell:
