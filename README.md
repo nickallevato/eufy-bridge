@@ -201,6 +201,14 @@ path wakes the doorbell: keep nginx LAN-only.
 
 ## Limitations
 
+- **eufy-security-client is deprecated** (repo archived 2026-09-12; development moved
+  to [`@mega-yfue/eufy-sdk`](https://github.com/mega-yfue/eufy-sdk), same maintainers,
+  new API, Node >= 24.5). This bridge stays pinned to `4.1.1-1`, which works, but
+  nobody will fix it when Eufy changes their cloud or P2P protocol. Porting means
+  rewriting the Eufy layer of `bridge.js` (login, captcha/2FA, device pick, push events,
+  livestream start/stop and its video data); the video pipeline does not change.
+  Port when the pin breaks, or once eufy-sdk is shown to stream a battery doorbell's
+  P2P livestream.
 - The launchers are plain processes: nothing restarts them after a reboot. Wrap them
   in a service manager (systemd, Docker, ...) if you rely on the stream.
 - Event-triggered live has mostly been driven by `/live` and the viewer hook; a real
