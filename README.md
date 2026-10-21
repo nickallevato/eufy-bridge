@@ -31,7 +31,8 @@ stops.
   share an identical SPS (800x1100, Main 4.0, no B-frames; checked byte for byte).
   Only GOP and CRF differ, which changes the PPS, and the PPS is resent with every IDR.
 - **Battery.** The doorbell streams only for `LIVE_SECONDS` (45) after the last event,
-  during a manual `/live`, or while a viewer holds it open (see
+  during a manual `/live`, for an optional periodic refresh (`REFRESH_MINUTES`), or
+  while a viewer holds it open (see
   [Live on demand](#live-on-demand-a-viewer-opening-the-stream)). The library's default
   30 s livestream cap is turned off; the bridge stops the stream itself.
 
@@ -79,6 +80,8 @@ All settings come from the environment; `bin/run-bridge` loads
 | `EUFY_DEVICE_SN` | first doorbell found | serial of the device to bridge, if the account sees several |
 | `EUFY_TRUSTED_DEVICE` | `eufy-bridge` | the name Eufy shows for this login |
 | `LIVE_SECONDS` | `45` | how long an event keeps the stream live |
+| `REFRESH_MINUTES` | `0` (off) | wake the doorbell for 10 s once the idle frame is this old, so the placeholder stays recent; every wake costs battery |
+| `REFRESH_HOURS` | `0-23` | local hours the refresh runs in, e.g. `7-19` for daytime only |
 | `RTSP_URL` | `rtsp://127.0.0.1:8554/doorbell` | where the bridge publishes |
 | `CONTROL_PORT` | `8099` | control API port |
 | `STATE_DIR` | `~/.local/state/eufy-bridge` | session tokens, last frame, idle loop |

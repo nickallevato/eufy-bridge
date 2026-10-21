@@ -11,14 +11,16 @@
 // on an IDR, and one 10 fps clock paces both, so the muxer only ever does
 // -c copy and the output timestamps are constant-rate.
 //
-// Triggers: motion/person/ring/... events from Eufy's cloud push, or
+// Triggers: motion/person/ring/... events from Eufy's cloud push,
+//   a periodic refresh when the last frame is REFRESH_MINUTES old (off by default), or
 //   GET http://<host>:8099/live?s=60   manual "go live"
 //   GET http://<host>:8099/status
 //
 // Env: EUFY_USER, EUFY_PASS (required), EUFY_COUNTRY (US), EUFY_DEVICE_SN,
 //      RTSP_URL (rtsp://127.0.0.1:8554/doorbell), LIVE_SECONDS (45),
 //      CONTROL_PORT (8099), STATE_DIR (~/.local/state/eufy-bridge),
-//      EUFY_TRUSTED_DEVICE (eufy-bridge: the name Eufy shows for this login)
+//      EUFY_TRUSTED_DEVICE (eufy-bridge: the name Eufy shows for this login),
+//      REFRESH_MINUTES (0 = off), REFRESH_HOURS (0-23, local hours to refresh in)
 // First login may ask for an emailed code: write it to $STATE_DIR/tfa-code.
 "use strict";
 const fs = require("fs");
@@ -34,6 +36,15 @@ fs.mkdirSync(STATE, { recursive: true, mode: 0o700 });
 const RTSP_URL = process.env.RTSP_URL || "rtsp://127.0.0.1:8554/doorbell";
 const LIVE_SECONDS = Number(process.env.LIVE_SECONDS || 45);
 const CONTROL_PORT = Number(process.env.CONTROL_PORT || 8099);
+// Refresh: wake the doorbell briefly once the idle frame is this old. Every wake
+// costs battery, so it is off by default and limited to REFRESH_HOURS ("7-19" =
+// 07:00 to 19:59 local). An event resets the clock, so busy hours cost nothing extra.
+const REFRESH_MINUTES = Number(process.env.REFRESH_MINUTES || 0);
+const [REFRESH_FROM, REFRESH_TO] = (process.env.REFRESH_HOURS || "0-23").split("-").map(Number);
+const REFRESH_SECONDS = 10; // P2P start + first keyframe take ~2 s; last.jpg is written at 1 fps
+// The first wake after a login can take ~35 s to deliver a stream, past a short
+// window: keep any stream that arrives this long, so the wake leaves a fresh frame.
+const MIN_STREAM_SECONDS = 8;
 const W = 800, H = 1100, FPS = 10;
 // Live: keyframe every 2 s, normal quality. Idle: one 5 s GOP of a blurred, dimmed
 // still at low quality -- ~28 kbps (~300 MB/day) instead of ~280 kbps (~3 GB/day).
@@ -183,6 +194,7 @@ function startLiveEncoder(metadata, video, audio) {
   streaming = true;
   startingLive = false;
   stats.liveSessions++;
+  liveUntil = Math.max(liveUntil, Date.now() + MIN_STREAM_SECONDS * 1000);
   liveEnc = spawn("ffmpeg", [
     "-hide_banner", "-loglevel", "error",
     // no stream probing: the probe alone held the first frame for ~1 s
@@ -211,13 +223,16 @@ function startLiveEncoder(metadata, video, audio) {
 }
 
 function endLive(why) {
-  if (mode === "live") log(`output: live -> idle (${why})`);
+  const hadPicture = mode === "live";
+  if (hadPicture) log(`output: live -> idle (${why})`);
+  else log(`no picture from this livestream (${why}); keeping the last frame`);
   mode = "idle";
   idleIdx = 0;
   streaming = false;
   liveGen++;
   liveQueue = [];
   if (liveEnc) { try { liveEnc.stdin.end(); } catch {} setTimeout(() => liveEnc && liveEnc.kill("SIGTERM"), 3000); }
+  if (!hadPicture) return; // last.jpg and its label are unchanged
   stats.lastLive = Date.now();
   setTimeout(buildIdleLoop, 1500); // after the encoder has written its final last.jpg
 }
@@ -229,6 +244,17 @@ setInterval(() => {
     endLive("window over");
   }
 }, 1000);
+
+// counts from the last attempt too, so a wake that fails is not retried every minute
+let lastRefresh = 0;
+setInterval(() => {
+  if (!REFRESH_MINUTES || !doorbellSN || streaming || startingLive) return;
+  const h = new Date().getHours();
+  if (h < REFRESH_FROM || h > REFRESH_TO) return;
+  if (Date.now() - Math.max(stats.lastLive || 0, lastRefresh) < REFRESH_MINUTES * 60000) return;
+  lastRefresh = Date.now();
+  triggerLive("refresh", REFRESH_SECONDS);
+}, 60000);
 
 // ---- control API ----
 http.createServer((req, res) => {
