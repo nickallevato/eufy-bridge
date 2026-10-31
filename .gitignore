@@ -2,3 +2,4 @@ node_modules/
 # runtime state lives in ~/.local/state/eufy-bridge, never here
 state/
 *.log
+eufy-bridge.env

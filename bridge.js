@@ -108,6 +108,8 @@ let liveEnc = null, liveUntil = 0, streaming = false, startingLive = false;
 // last.jpg is rewritten during every live session, so its mtime survives restarts
 const stats = {
   underflows: 0, liveSessions: 0, lastEvent: null, auIdle: 0, auLive: 0,
+  // for monitoring: a running process is not a working bridge until both are true
+  cloudConnected: false, pushConnected: false, startedAt: new Date().toISOString(),
   lastLive: fs.existsSync(LAST_JPG) ? fs.statSync(LAST_JPG).mtimeMs : null,
 };
 
@@ -314,9 +316,10 @@ async function main() {
   eufy.on("device added", (d) => {
     if (!doorbellSN && pick(d)) { doorbellSN = d.getSerial(); log(`doorbell: ${d.getName()} ${doorbellSN}`); }
   });
-  eufy.on("connect", () => log("logged in to Eufy cloud"));
-  eufy.on("push connect", () => log("push notifications connected (event triggers armed)"));
-  eufy.on("push close", () => log("push notifications closed"));
+  eufy.on("connect", () => { stats.cloudConnected = true; log("logged in to Eufy cloud"); });
+  eufy.on("close", () => { stats.cloudConnected = false; log("disconnected from Eufy cloud"); });
+  eufy.on("push connect", () => { stats.pushConnected = true; log("push notifications connected (event triggers armed)"); });
+  eufy.on("push close", () => { stats.pushConnected = false; log("push notifications closed"); });
   eufy.on("connection error", (e) => log("connection error:", e.message));
   eufy.on("tfa request", async () => {
     log("Eufy emailed a login code");

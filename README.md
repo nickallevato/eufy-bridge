@@ -68,6 +68,23 @@ stops.
 `npm run probe` (with the env loaded) logs in read-only and prints what the account
 sees: pending share invites, devices, and battery.
 
+### Docker
+
+`compose.yml` runs the bridge and MediaMTX as two containers, both on host
+networking (the P2P link finds the doorbell by LAN broadcast, and WebRTC needs
+real host addresses):
+
+```bash
+cp eufy-bridge.env.example eufy-bridge.env && chmod 600 eufy-bridge.env   # fill in
+mkdir -p state && sudo chown 1000:1000 state && chmod 700 state
+docker compose up -d --build
+```
+
+Moving an existing install? Copy its `persistent.json` into `state/` first, with
+the same `EUFY_TRUSTED_DEVICE`, so Eufy sees the same device and does not ask
+for a new login code. Stop the old bridge before starting the new one: two
+bridges on one account sign each other out.
+
 ## Configuration
 
 All settings come from the environment; `bin/run-bridge` loads
@@ -97,7 +114,7 @@ Runtime files, all outside the repo:
 
 | Request | Effect |
 |---|---|
-| `GET /status` | JSON: mode (`idle`/`live`), live-until, live sessions, underflows, last event |
+| `GET /status` | JSON: mode (`idle`/`live`), live-until, live sessions, underflows, last event, `lastLive` (epoch ms of the last real picture), and `cloudConnected` / `pushConnected` (logged in, and event triggers armed: a monitor should alert on either being false) |
 | `GET /live?s=60` | go live now for `s` seconds (5-600, default 60) |
 | `GET /live?s=60&reason=viewer` | same, tagged with a reason (`[a-z-]{1,20}`) in `/status` and the log |
 
@@ -228,7 +245,8 @@ path wakes the doorbell: keep nginx LAN-only.
 |---|---|
 | `bridge.js` | the bridge |
 | `mediamtx.yml` | RTSP/WebRTC server config |
-| `bin/run-bridge`, `bin/run-mediamtx` | launchers |
+| `bin/run-bridge`, `bin/run-mediamtx` | launchers, for running without Docker |
+| `Dockerfile`, `compose.yml`, `eufy-bridge.env.example` | the container deployment |
 | `shinobi/doorbell_monitor.py` | create/check/remove the Shinobi monitor; runs on the Shinobi host |
 | `tools/probe-account.js` | read-only: what the Eufy account sees (invites, devices, battery) |
 

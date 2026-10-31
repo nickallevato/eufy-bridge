@@ -1,0 +1,44 @@
+# eufy-bridge + MediaMTX.
+#
+#   cp eufy-bridge.env.example eufy-bridge.env   # then fill in, chmod 600
+#   mkdir -p state && sudo chown 1000:1000 state && chmod 700 state
+#   docker compose up -d --build
+#
+# Host networking for both, on purpose:
+#   - the bridge reaches the doorbell over Eufy's P2P protocol (UDP 32108),
+#     which finds the device by LAN broadcast; behind a bridge network it falls
+#     back to relaying through Eufy's cloud, or fails
+#   - MediaMTX's WebRTC needs its UDP port (8189) and real host addresses in
+#     its ICE candidates
+# Ports on the host: 8099 (bridge control API), 8554 (RTSP), 8888 (HLS),
+# 8889 (WebRTC page), 8189/udp (WebRTC media), 8000-8001/udp (RTSP over UDP).
+services:
+  bridge:
+    build: .
+    image: eufy-bridge:local
+    container_name: eufy-bridge
+    restart: unless-stopped
+    network_mode: host
+    env_file: ${EUFY_BRIDGE_ENV:-./eufy-bridge.env}
+    environment:
+      RTSP_URL: rtsp://127.0.0.1:8554/doorbell
+    volumes:
+      - ${EUFY_BRIDGE_STATE:-./state}:/state
+    depends_on:
+      - mediamtx
+    # SIGTERM -> the bridge stops the doorbell's livestream before exiting
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  mediamtx:
+    image: bluenviron/mediamtx:1.15.3
+    container_name: eufy-bridge-mediamtx
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./mediamtx.yml:/mediamtx.yml:ro
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
