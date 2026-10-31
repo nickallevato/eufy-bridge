@@ -3,3 +3,4 @@ node_modules/
 state/
 *.log
 eufy-bridge.env
+__pycache__/
