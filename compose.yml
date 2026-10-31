@@ -12,6 +12,7 @@
 #     its ICE candidates
 # Ports on the host: 8099 (bridge control API), 8554 (RTSP), 8888 (HLS),
 # 8889 (WebRTC page), 8189/udp (WebRTC media), 8000-8001/udp (RTSP over UDP).
+# Nothing in the bridge needs HLS: set MTX_HLS=no (in .env) if 8888 is taken.
 services:
   bridge:
     build: .
@@ -37,6 +38,9 @@ services:
     container_name: eufy-bridge-mediamtx
     restart: unless-stopped
     network_mode: host
+    environment:
+      # MTX_<KEY> overrides mediamtx.yml
+      MTX_HLS: ${MTX_HLS:-yes}
     volumes:
       - ./mediamtx.yml:/mediamtx.yml:ro
     logging:
